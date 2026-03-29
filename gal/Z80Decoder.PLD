@@ -1,0 +1,125 @@
+Name            Z80Decoder;
+Partno          Z80;
+Revision        01;
+Date            02/22/26;
+Designer        JR Endea;
+Company         ;
+Location        USA;
+Assembly        None;
+Device          p22v10;
+
+
+/* Pin Map 
+        --------
+I/CLK  |1     24| Vcc
+I      |2     23| I/O/Q
+I      |3     22| I/O/Q
+I      |4     21| I/O/Q
+I      |5     20| I/O/Q
+I      |6     19| I/O/Q
+I      |7     18| I/O/Q
+I      |8     17| I/O/Q
+I      |9     16| I/O/Q
+I      |10    15| I/O/Q
+I      |11    14| I/O/Q
+Gnd    |12    13| I
+        --------
+
+        --------
+/RD    |1     24| Vcc
+/WR    |2     23| /ROM_CE
+/MREQ  |3     22| /RAM_CE
+/IOREQ |4     21| /RAM_WE
+A15    |5     20| /IO1
+A5     |6     19| /IO2
+A6     |7     18| /IO3
+A7     |8     17| /IO4
+       |9     16| /IO5
+       |10    15| /IO6
+       |11    14| /IO7
+Gnd    |12    13| 
+        --------
+*/
+
+/*
+ * Inputs:  All are signals from the 6502, 65C02, 65816
+ */
+/*
+Pin 1 = RD;
+Pin 2 = WR;
+Pin 3 = MREQ;
+Pin 4 = IOREQ;
+Pin 5 = A15;  /* RAM vs ROM * /
+Pin 6 = A4;   /* IO 0x10 * /
+Pin 7 = A5;   /* IO 0x20 * /
+Pin 8 = A6;   /* IO 0x40 * /
+Pin 9 = A7;   /* IO 0x80 * /
+*/
+
+Pin 1 = RD;
+Pin 2 = WR;
+Pin 3 = MREQ;
+Pin 4 = IOREQ;
+Pin 5 = A15;  /* RAM vs ROM */
+Pin 6 = A5;   /* IO */
+Pin 7 = A6;   /* IO */
+Pin 8 = A7;   /* IO */
+/*Pin 9 = ;*/
+/*Pin 10 = ;*/
+/*Pin 11 = ;*/
+/*Pin 13 = ;*/
+
+/*
+ * Outputs:  define outputs - all are simple combinatorial
+ */
+/*
+Pin 23 = ROM_CE; /* ROM Chip Enable * /
+Pin 22 = ROM_OE; /* ROM Output Enable * /
+Pin 21 = RAM_CE; /* RAM Chip Enable * /
+Pin 20 = RAM_OE; /* RAM Output Enable * /
+Pin 19 = RAM_WE; /* RAM Write Enable * /
+Pin 18 = IO1_CE; /* IO at 0x10 * /
+Pin 17 = IO2_CE; /* IO at 0x20 * /
+Pin 16 = IO3_CE; /* IO at 0x40 * /
+Pin 15 = IO4_CE; /* IO at 0x80 * /
+*/
+/*Pin 14 = ;*/
+
+Pin 23 = ROM_CE; /* ROM Chip Enable */
+Pin 22 = RAM_CE; /* RAM Chip Enable */
+Pin 21 = RAM_WE; /* RAM Write Enable */
+Pin 20 = IO1_CE; /* IO at 0x00 */
+Pin 19 = IO2_CE; /* IO at 0x20 */
+Pin 18 = IO3_CE; /* IO at 0x40 */
+Pin 17 = IO4_CE; /* IO at 0x60 */
+Pin 16 = IO5_CE; /* IO at 0x80 */
+Pin 15 = IO6_CE; /* IO at 0xA0 */
+Pin 14 = IO7_CE; /* IO at 0xC0 */
+
+
+/*
+ * Logic:  All outputs are active low signals in the target system.
+ */
+/*
+!ROM_CE = !MREQ & !A15;
+!ROM_OE = !MREQ & !A15 & !RD;
+!RAM_CE = !MREQ & A15;
+!RAM_OE = !MREQ & A15 & !RD;
+!RAM_WE = !MREQ & A15 & !WR;
+!IO1_CE = !IOREQ & A4;
+!IO2_CE = !IOREQ & A5;
+!IO3_CE = !IOREQ & A6;
+!IO4_CE = !IOREQ & A7;
+*/
+
+!ROM_CE = !MREQ & !A15;
+!RAM_CE = !MREQ & A15;
+!RAM_WE = !MREQ & A15 & !WR;
+!IO1_CE = !IOREQ & !A5 & !A6 & !A7;
+!IO2_CE = !IOREQ &  A5 & !A6 & !A7;
+!IO3_CE = !IOREQ & !A5 &  A6 & !A7;
+!IO4_CE = !IOREQ &  A5 &  A6 & !A7;
+!IO5_CE = !IOREQ & !A5 & !A6 &  A7;
+!IO6_CE = !IOREQ &  A5 & !A6 &  A7;
+!IO7_CE = !IOREQ & !A5 &  A6 &  A7;
+

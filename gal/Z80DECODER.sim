@@ -1,0 +1,86 @@
+%SIGNAL
+PIN   6 =  A5 
+PIN   7 =  A6 
+PIN   8 =  A7 
+PIN   5 =  A15 
+PIN  20 =  IO1_CE 
+PIN  19 =  IO2_CE 
+PIN  18 =  IO3_CE 
+PIN  17 =  IO4_CE 
+PIN  16 =  IO5_CE 
+PIN  15 =  IO6_CE 
+PIN  14 =  IO7_CE 
+PIN   4 =  IOREQ 
+PIN   3 =  MREQ 
+PIN  22 =  RAM_CE 
+PIN  21 =  RAM_WE 
+PIN   1 =  RD 
+PIN  23 =  ROM_CE 
+PIN   2 =  WR 
+%END
+
+%FIELD
+%END
+
+%EQUATION
+!IO1_CE =>
+    !A5 & !A6 & !A7 & !IOREQ
+
+!IO2_CE =>
+    A5 & !A6 & !A7 & !IOREQ
+
+!IO3_CE =>
+    !A5 & A6 & !A7 & !IOREQ
+
+!IO4_CE =>
+    A5 & A6 & !A7 & !IOREQ
+
+!IO5_CE =>
+    !A5 & !A6 & A7 & !IOREQ
+
+!IO6_CE =>
+    A5 & !A6 & A7 & !IOREQ
+
+!IO7_CE =>
+    !A5 & A6 & A7 & !IOREQ
+
+!RAM_CE =>
+    A15 & !MREQ
+
+!RAM_WE =>
+    A15 & !MREQ & !WR
+
+!ROM_CE =>
+    !A15 & !MREQ
+
+IO1_CE.oe  =>
+    1 
+
+IO2_CE.oe  =>
+    1 
+
+IO3_CE.oe  =>
+    1 
+
+IO4_CE.oe  =>
+    1 
+
+IO5_CE.oe  =>
+    1 
+
+IO6_CE.oe  =>
+    1 
+
+IO7_CE.oe  =>
+    1 
+
+RAM_CE.oe  =>
+    1 
+
+RAM_WE.oe  =>
+    1 
+
+ROM_CE.oe  =>
+    1 
+
+%END
