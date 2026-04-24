@@ -2,13 +2,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;           CONSTANTS            ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;LED_PORT		equ	$00
 
-
-;BOTTOM_OF_STACK	equ 	$2000	; "top" stack adress at 4 KB
-;BOTTOM_OF_STACK	equ 	0xffff	; "top" stack adress at 4 KB
-	RAMBEG:	EQU 0x8000
-	RAMEND:	EQU 0xffff
+RAMBEG:	EQU 0x8000
+RAMEND:	EQU 0xffff
 
 BOOT_FLAG_WARM	equ	$AA
 
@@ -25,25 +21,29 @@ org $0000
 
 ;;;;;;;;;; AREA FOR RESET VECTORS AND SO ON HERE ;;;;;;;;;;;;
 				;org 	$0030
-				ds $002D
+				ds $002d
 rst30:			jp		monitor_enter				; breakpoint reset vector
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;               RAM TESTING & INITIALIZATION               ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;initialize:		ld 		sp, BOTTOM_OF_STACK			; set up stack pointer 
 initialize:		ld 		sp, RAMEND			; set up stack pointer 
 				
-				call sio_init					; initialize serial communication
+				;call sio_init					; initialize serial communication
 				call pc_16550_init					; initialize serial communication
-				call pio_init
 				call lcd_init
-
-				ld		HL, str_init				; print welcome message
-				call	print_string
+				;call pio_init
+				call pc_8255_init
 
 				ld		HL, str_lcd_init
 				call lcd_print
+
+				ld		HL, str_init				; print welcome message
+				call	print_string
 	
 				; cold/warm start
 				ld		hl, boot_flag
@@ -56,21 +56,285 @@ initialize:		ld 		sp, RAMEND			; set up stack pointer
 				
 				ld		hl, str_cold_boot			; print cold boot message
 				call	print_string
+
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;; STEP 1: Test and zero initial RAM
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				ld		hl, str_step1_init			; print step 1 message
+				call	print_string
 				
-				; clear RAM
-				;ld		hl, END_OF_PROGRAM			; load hl with starting point of area to be cleared
-				;ld		de, END_OF_PROGRAM + 1		; load de with starting point of area to be cleared + 1
-				;ld		bc,	$7fff - END_OF_PROGRAM  ; bc holds number of bytes to clear (NO parantesis since this is another command!!)
-				ld		hl, RAMBEG			; load hl with starting point of area to be cleared
-				ld		de, RAMBEG + 1		; load de with starting point of area to be cleared + 1
-				ld		bc,	RAMEND - RAMBEG -1 ; bc holds number of bytes to clear (NO parantesis since this is another command!!)
-				ld		(hl), $00					; load the first byte with 0
-				ldir								;d do (DE)<-(HL); HL++, DE++, until BC == 0. Since HL is one byte behind DE, zeroes will be copied one byte forward untill all of memory is cleared
+				; Test full RAM range from RAMBEG to RAMEND
+				ld		hl, RAMBEG				; start of RAM to test
+				ld		bc, RAMEND - RAMBEG		; test full range
+				call	find_ram_end			; find actual RAM available
 				
+				; Test result
+				ld		a, b
+				or		c						; check if any RAM found
+				jr		nz, step1_ram_found
+				
+				ld		hl, str_ram_test_failed
+				call	print_string
+				jr		step1_complete
+				
+step1_ram_found:
+				ld		hl, str_ram_test_success
+				call	print_string
+				call	report_ram_size			; report size in BC
+				
+				; Zero out only the area where code will go
+				ld		hl, RAMBEG
+				ld		bc, END_OF_PROGRAM		; zero up to where code ends
+				call	zero_memory
+				
+				ld		hl, str_ram_cleared
+				call	print_string
+				
+step1_complete:
+
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;; STEP 2: Copy entire code to RAM
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				ld		hl, str_step2_init		; print step 2 message
+				call	print_string
+				
+				call	copy_code_to_ram		; copy code from ROM to RAM
+				
+				ld		hl, str_code_copied
+				call	print_string
+				
+				; Switch execution to RAM
+				; Calculate address of next instruction (step2_continue) and add RAMBEG offset
+				ld		hl, step2_continue		; get address of next instruction
+				ld		de, RAMBEG
+				add		hl, de					; offset to RAM location
+				jp		(hl)					; jump to RAM and continue execution there
+				
+step2_continue:
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;; VERIFY: We're running from RAM above 0x8000
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				; Get current PC by using call to push return address
+				call get_current_pc			; HL will contain this instruction's address
+				
+				ld		(temp_pc), hl			; save PC temporarily
+				
+				ld		hl, str_pc_prefix
+				call	print_string
+				
+				ld		hl, (temp_pc)
+				call	print_word				; print the PC address
+				
+				; Check if PC is >= 0x8000 (in RAM)
+				ld		hl, (temp_pc)
+				ld		a, h
+				cp		$80						; check if high byte >= 0x80
+				jr		c, ram_exec_failed		; if less than 0x80, we're not in RAM
+				
+				; If we got here, PC is in RAM!
+				ld		hl, str_ram_exec_success
+				call	print_string
+				jr		ram_exec_verified
+				
+get_current_pc:	pop		hl					; pop return address into HL
+				push	hl					; push it back for the ret
+				ret
+				
+ram_exec_failed:
+				ld		hl, str_ram_exec_failed
+				call	print_string
+				
+ram_exec_verified:
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;; STEP 3: Test extended RAM (formerly ROM area)
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				ld		hl, str_step3_init		; print step 3 message
+				call	print_string
+				
+				; Test ROM area (0x0000 to 0x7FFF) - now available since code copied to RAM
+				ld		hl, $0000				; start at ROM area
+				ld		bc, RAMBEG				; test up to RAMBEG (0x8000 - 32KB)
+				call	find_ram_end			; test extended RAM
+				
+				ld		a, b
+				or		c
+				jr		nz, step3_ram_found
+				
+				ld		hl, str_extended_ram_test_failed
+				call	print_string
+				jr		step3_complete
+				
+step3_ram_found:
+				ld		hl, str_extended_ram_test_success
+				call	print_string
+				call	report_ram_size			; report additional RAM size
+				
+				; Zero out the formerly-ROM area
+				ld		hl, $0000
+				ld		bc, RAMBEG				; zero from 0x0000 to 0x7FFF
+				call	zero_memory
+				
+				ld		hl, str_extended_ram_cleared
+				call	print_string
+				
+step3_complete:
+
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				;; Continue with normal initialization
+				;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 				ld		hl, boot_flag				; set the boot flag
 				ld		(hl), BOOT_FLAG_WARM
 
-				jr		main_command_loop			; enter main command line	
+				jp		main_command_loop			; enter main command line
+
+; test_ram_byte - test a single RAM byte with safer pattern
+; Input: HL = address to test
+; Output: A = 0 if test passed, 1 if failed
+test_ram_byte:	push	bc
+				push	de
+				
+				; Save original value
+				ld		a, (hl)
+				ld		b, a					; save in B
+				
+				; Test pattern 1: $55
+				ld		a, $55
+				ld		(hl), a
+				ld		c, a					; expected value
+				ld		a, (hl)
+				cp		c
+				jr		nz, test_failed_restore
+				
+				; Test pattern 2: $AA
+				ld		a, $AA
+				ld		(hl), a
+				ld		c, a
+				ld		a, (hl)
+				cp		c
+				jr		nz, test_failed_restore
+				
+				; Restore original value
+				ld		a, b
+				ld		(hl), a
+				xor		a						; return 0 (success)
+				pop		de
+				pop		bc
+				ret
+				
+test_failed_restore:
+				ld		a, b					; restore original value
+				ld		(hl), a
+				ld		a, 1					; return 1 (failed)
+				pop		de
+				pop		bc
+				ret
+
+; find_ram_end - find the end of available RAM (safer version)
+; Input: HL = start address, BC = max size to test
+; Output: HL = address of last good RAM location, BC = size of RAM found
+find_ram_end:	push	de
+				push	af
+				ld		d, h					; save start address in DE
+				ld		e, l
+				ld		a, 0					; failure counter
+				
+test_loop:		call	test_ram_byte			; test current location
+				cp		0						; check if test passed
+				jr		z, test_ok				; if passed, continue
+				
+				inc		a						; increment failure counter
+				cp		3						; allow 3 consecutive failures before giving up
+				jr		c, test_ok				; continue if under 3 failures
+				jr		test_failed				; give up if 3 consecutive failures
+				
+test_ok:		cp		0						; reset failure counter on success
+				jr		nz, continue_test
+				xor		a						; failure counter back to 0
+				
+continue_test:	inc		hl						; move to next address
+				dec		bc						; decrement count
+				ld		a, b
+				or		c						; check if BC == 0
+				jr		nz, test_loop			; continue if more to test
+				jr		test_complete			; done with loop
+				
+test_failed:	dec		hl						; back up to last good address
+				
+test_complete:	ld		a, l					; calculate size: HL - DE
+				sub		e
+				ld		c, a
+				ld		a, h
+				sbc		d
+				ld		b, a						; BC now holds size (low byte in C, high byte in B)
+				
+				pop		af
+				pop		de
+				ret
+
+; zero_memory - zero out memory range
+; Input: HL = start address, BC = number of bytes
+; Output: Memory cleared
+zero_memory:	ld		(hl), $00				; write first byte
+				ld		de, hl
+				inc		de						; point DE to next byte
+				dec		bc						; decrement count
+				ldir								; copy zeros to rest of range
+				ret
+
+; copy_code_to_ram - copy code from ROM to RAM
+; Input: None (uses END_OF_PROGRAM)
+; Output: None (code copied from $0000 to RAMBEG)
+copy_code_to_ram:
+				ld		hl, $0000				; source: ROM start
+				ld		de, RAMBEG				; destination: RAM start
+				ld		bc, END_OF_PROGRAM		; size: up to END_OF_PROGRAM
+				ldir								; copy
+				ret
+
+; report_ram_size - print RAM size in hex
+; Input: BC = RAM size in bytes
+; Output: None
+report_ram_size:
+				push	bc
+				ld		hl, str_ram_size_prefix
+				call	print_string
+				pop		bc
+				
+				; print BC in hex (4 hex digits)
+				ld		a, b
+				call	print_hex_byte
+				ld		a, c
+				call	print_hex_byte
+				
+				ld		hl, str_ram_size_suffix
+				call	print_string
+				ret
+
+; print_hex_byte - print a byte as 2 hex digits
+; Input: A = byte to print
+; Output: None
+print_hex_byte:	push	af
+				rra
+				rra
+				rra
+				rra							; rotate high nibble to low
+				and		0x0F					; mask to low nibble
+				call	print_hex_digit
+				pop		af
+				and		0x0F					; mask to low nibble
+				
+print_hex_digit:
+				add		a, $30					; add ASCII '0'
+				cp		$3A						; check if > 9
+				jr		c, is_digit				; if <= 9, it's a digit
+				add		a, $07					; add 7 to convert to A-F
+				
+is_digit:		call	putc
+				ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
 
 
 ; monitor program starts here
@@ -227,26 +491,16 @@ str_regdump_alt:	db		"A' F' B' C' D' E' H' L'", CR, LF, EOS
 str_regdump_index:	db		"IX    IY", CR, LF, EOS
 
 
-// getc:
-// ;call sio_getc
-// call pc_getc
-// ret
-
-// putc:
-// ;call sio_putc
-// call pc_putc
-// ret
-
+#include "utilities.asm"
 #INCLUDE	"cli.asm"
 #INCLUDE	"commands.asm"
 #INCLUDE	"string.asm"
-#INCLUDE	"pio_driver.asm"
-#INCLUDE	"sio_driver.asm"
-#INCLUDE	"16550_driver.asm"
+;#INCLUDE	"pio_driver.asm"
+;#INCLUDE	"lcd_bus_driver.asm"
+#INCLUDE	"lcd_8255_driver.asm"
 #INCLUDE	"8255_driver.asm"
-#INCLUDE	"lcd_driver.asm"
-
-
+#INCLUDE	"16550_driver.asm"
+;#INCLUDE	"sio_driver.asm"
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -267,18 +521,37 @@ str_commands:	db		" Available Commands are: ", CR, LF
 
 str_lcd_init: db "JREZ80 ...", EOS
 
+; RAM Testing and Initialization strings
+str_step1_init:	db		CR, LF, "=== STEP 1: Testing & Zeroing Initial RAM ===", CR, LF, EOS
+str_ram_test_success:	db		"RAM Test: PASSED - Size: 0x", EOS
+str_ram_test_failed:	db		"RAM Test: FAILED", CR, LF, EOS
+str_ram_cleared:	db		" bytes", CR, LF, "Initial RAM cleared.", CR, LF, EOS
+
+str_step2_init:	db		CR, LF, "=== STEP 2: Copying Code to RAM ===", CR, LF, EOS
+str_code_copied:	db		"Code copied to RAM.", EOS
+
+str_pc_prefix:	db		CR, LF, "Current PC: 0x", EOS
+str_ram_exec_success:	db		" (RAM confirmed)", CR, LF, EOS
+str_ram_exec_failed:	db		" (ERROR: Not in RAM!)", CR, LF, EOS
+
+str_step3_init:	db		CR, LF, "=== STEP 3: Testing Extended RAM ===", CR, LF, EOS
+str_extended_ram_test_success:	db		"Extended RAM Test: PASSED - Size: 0x", EOS
+str_extended_ram_test_failed:	db		"Extended RAM Test: FAILED", CR, LF, EOS
+str_extended_ram_cleared:	db		" bytes)", CR, LF, "Extended RAM cleared.", CR, LF, EOS
+
+str_ram_size_prefix:	db		"", EOS
+str_ram_size_suffix:	db		"", EOS
+
+END_OF_PROGRAM:  equ    ($ + 0FFH) & 0FF00H   ; next 256 byte boundary
+
+
+
 SECTION bss
 org $8000
 
-;// TODO: MOVE THIS TO ITS OWN "RAM"-FILE
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;           VARIABLES            ;;
-;;	BLOCK n, reserves n bytes and ;;
-;;  the label gets the value of	  ;;
-;;  the first address			  ;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 boot_flag:      db     0                ; boot flag
+
+temp_pc:        ds      2               ; temporary storage for PC value
 
 argc:           ds      1               ; holds number of arguments
 argv:           ds      16*2            ; array of pointers to the respective arguments (16 arguments = 32 bytes in size, see below)
@@ -293,10 +566,3 @@ mon_reg_rtn_addr:   ds  2               ; stores the return address (just for di
 mon_stack_backup:   ds  2               ; just a backup variable to not mess up the original stack pointer while saving/restoring
 
 cf_sector_buffer:   ds  512
-END_OF_PROGRAM:  equ    ($ + 0FFH) & 0FF00H   ; next 256 byte boundary
-
-; .ECHO	"END_OF_PROGRAM: "
-; .ECHO	END_OF_PROGRAM
-; .ECHO	"\n"
-
-.END

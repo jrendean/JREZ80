@@ -27,7 +27,7 @@ command_table:	dw		str_cmd_help, cmd_help
 				;dw		str_cmd_test, cmd_test	; test command
 				dw		str_cmd_breaktest, cmd_breaktest ; breaktest command
 				dw		str_cmd_reg, dump_registers ; dump registers command
-				dw		str_cmd_pio, cmd_pio ; pio
+				;dw		str_cmd_pio, cmd_pio ; pio
 				dw		str_cmd_load, LOAD ; LOAD
 				dw		str_cmd_rdump, rdump	; dump command
 				dw		str_cmd_pc16o1on, cmd_pc16o1on ; pio
@@ -341,6 +341,10 @@ rdump:           push    af
                 ld      hl, 0
                 add     hl, sp
                 call    print_word
+				ld      hl, rdump_msg_6
+                call    print_string
+				call get_pc ;returns pc in hl
+				call    print_word
                 call    print_newline
                 pop     hl
                 pop     af
@@ -350,7 +354,15 @@ rdump_msg_2:     db    TAB, "2nd:", EOS
 rdump_msg_3:     db    TAB, "PTR: IX=", EOS
 rdump_msg_4:     db    " IY=", EOS
 rdump_msg_5:     db    " SP=", EOS
+rdump_msg_6:     db    " PC=", EOS
 ;
+
+
+
+get_pc:
+Pop hl
+Push hl
+Ret
 rdump_one_set:   push    hl              ; Print one register set
                 ld      hl, rdump_os_msg_1
                 call    print_string
@@ -378,25 +390,25 @@ rdump_os_msg_4:  db    " HL=", EOS
 
 
 
-cmd_pio:
-	ld a, (argc)
-	jr		nz, cmd_pio_error
+// cmd_pio:
+// 	ld a, (argc)
+// 	jr		nz, cmd_pio_error
 	
-	; read in argument
-	ld		hl, (argv)
-	call	str_parse_word
-	jr		nc, cmd_pio_error
+// 	; read in argument
+// 	ld		hl, (argv)
+// 	call	str_parse_word
+// 	jr		nc, cmd_pio_error
 
-	LD	A, e
-	call pio_outpout_a
-	ret
+// 	LD	A, e
+// 	call pio_outpout_a
+// 	ret
 
-cmd_pio_error:
-	ld		hl,str_cmd_pio_err
-	call	print_string
-	ret
+// cmd_pio_error:
+// 	ld		hl,str_cmd_pio_err
+// 	call	print_string
+// 	ret
 
-str_cmd_pio_err: 	DB		"Usage: pio <value>", CR, LF, EOS
+// str_cmd_pio_err: 	DB		"Usage: pio <value>", CR, LF, EOS
 
 
 cmd_pc16o1on:

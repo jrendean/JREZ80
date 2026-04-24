@@ -12,6 +12,6 @@ pio_init:
 	OUT	(PIOAC), A
     ret
 
-pio_outpout_a:
+pio_output_a:
   OUT   (PIOAD), A
   ret
