@@ -35,16 +35,16 @@ initialize:		ld 		sp, RAMEND			; set up stack pointer
 				
 				;call sio_init					; initialize serial communication
 				call pc_16550_init					; initialize serial communication
+				call pc_8255_init
 				call lcd_init
 				;call pio_init
-				call pc_8255_init
+
+				ld		HL, str_init				; print welcome message
+				call	print_string
 
 				ld		HL, str_lcd_init
 				call lcd_print
 
-				ld		HL, str_init				; print welcome message
-				call	print_string
-	
 				; cold/warm start
 				ld		hl, boot_flag
 				ld		a, (hl)						; load boot_flag contents into A register

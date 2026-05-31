@@ -15,7 +15,7 @@ str_cmd_pc16o1on:		db		"1o", EOS
 str_cmd_pc16o1of:		db		"1f", EOS
 str_cmd_pc16o2on:		db		"2o", EOS
 str_cmd_pc16o2of:		db		"2f", EOS
-
+str_cmd_lcdprint:		db		"lcd", EOS
 
 command_table:	dw		str_cmd_help, cmd_help
 				dw		str_cmd_rst, cmd_reset	; reset command
@@ -34,9 +34,17 @@ command_table:	dw		str_cmd_help, cmd_help
 				dw		str_cmd_pc16o1of, cmd_pc16o1of ; pio
 				dw		str_cmd_pc16o2on, cmd_pc16o2on ; pio
 				dw		str_cmd_pc16o2of, cmd_pc16o2of ; pio
+				dw 		str_cmd_lcdprint, cmd_lcdprint
 
 command_table_entries:	equ	($ - command_table) / (2*2)	; calculate size using bytes
 
+
+cmd_lcdprint:
+				call 	lcd_clear
+				ld 		hl,cmd_lcdprint_str
+				call 	lcd_print
+				ret
+cmd_lcdprint_str:	db		"Hello world", EOS
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; cmd_help - prints the help info for the user				

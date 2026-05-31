@@ -1,8 +1,8 @@
 ;8255 port address(base 00h):	
-paadr: 		equ 60h		; Address of PortA
-pbadr: 		equ 61h		; Address of PortB
-pcadr: 		equ 62h		; Address of PortC
-cwadr: 		equ 63h		; Address of Control Word
+paadr: 		equ 40h		; Address of PortA
+pbadr: 		equ 41h		; Address of PortB
+pcadr: 		equ 42h		; Address of PortC
+cwadr: 		equ 43h		; Address of Control Word
 ;stuff to be written into the control word of the 8255:
 ;Some of the change the state of the ports and some manipulate
 ;bits on port C
@@ -52,6 +52,10 @@ lcd_init:
     call init_command_4bit
     ret
 
+lcd_clear:
+    ld a, $01           ; Clear display
+    call init_command_4bit
+    ret
 
 lcd_print:
     ;ld hl,message   ;Message address

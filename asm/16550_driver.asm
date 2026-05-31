@@ -2,7 +2,7 @@
 #DEFINE		PC_16550_DRIVER
 
 ; port definitions for the 16550 chip
-uart_base       equ     $80
+uart_base       equ     $20
 
 uart_register_0 equ     uart_base + 0
 uart_register_1 equ     uart_base + 1
