@@ -64,10 +64,10 @@ Pin 23 = ROM_CE; /* ROM Chip Enable */
 Pin 22 = RAM_CE; /* RAM Chip Enable */
 Pin 21 = RAM_WE; /* RAM Write Enable */
 Pin 20 = IO1_CE; /* IO at 0x00 */ /* rom swap */
-Pin 19 = IO2_CE; /* IO at 0x20 */ /* pio */
-Pin 18 = IO3_CE; /* IO at 0x40 */ /* lcd */
-Pin 17 = IO4_CE; /* IO at 0x60 */ /* 8255 */
-Pin 16 = IO5_CE; /* IO at 0x80 */ /* 16550 */
+Pin 19 = IO2_CE; /* IO at 0x20 */ /* 16550 */
+Pin 18 = IO3_CE; /* IO at 0x40 */ /* 8255 */
+Pin 17 = IO4_CE; /* IO at 0x60 */ /* */
+Pin 16 = IO5_CE; /* IO at 0x80 */ /* */
 Pin 15 = IO6_CE; /* IO at 0xA0 */ /* */
 Pin 14 = IO7_CE; /* IO at 0xC0 */ /* */
 
